@@ -23,9 +23,6 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        .zgl = .{
-            .path = "lib/zgl",
-        },
         .mach_glfw = .{
             .path = "lib/mach-glfw",
         },

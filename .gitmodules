@@ -1,6 +1,3 @@
-[submodule "lib/zgl"]
-	path = lib/zgl
-	url = https://github.com/ziglibs/zgl.git
 [submodule "lib/mach-glfw"]
 	path = lib/mach-glfw
 	url = https://github.com/lulvz/mach-glfw.git

@@ -50,11 +50,10 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const zgl = b.dependency("zgl", .{
-        .target = target,
-        .optimize = optimize,
+    const gl_bindings = b.createModule(.{
+        .root_source_file = b.path("lib/gl-bindings.zig"),
     });
-    exe.root_module.addImport("zgl", zgl.module("zgl"));
+    exe.root_module.addImport("gl-bindings", gl_bindings);
 
     const mach_glfw = b.dependency("mach_glfw", .{
         .target = target,
