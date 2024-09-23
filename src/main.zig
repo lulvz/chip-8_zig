@@ -14,6 +14,22 @@ fn glGetProcAddress(p: glfw.GLProc, proc: [:0]const u8) ?gl.FunctionPointer {
     return glfw.getProcAddress(proc);
 }
 
+pub fn openROM(rom_path: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    const file = try std.fs.cwd().openFile(rom_path, .{});
+    defer file.close();
+    
+    const file_size = try file.getEndPos();
+    const buffer = try allocator.alloc(u8, file_size);
+    errdefer allocator.free(buffer);
+    
+    const bytes_read = try file.readAll(buffer);
+    if (bytes_read != file_size) {
+        return error.IncompleteRead;
+    }
+    
+    return buffer;
+}
+
 pub fn main() !void {
     glfw.setErrorCallback(errorCallback);
     if (!glfw.init(.{})) {
@@ -35,12 +51,17 @@ pub fn main() !void {
     defer window.destroy();
     glfw.makeContextCurrent(window);
 
-    const proc: glfw.GLProc = undefined;
-    try gl.load(proc, glGetProcAddress);
+    const proc: glfw.GLProc = undefined; try gl.load(proc, glGetProcAddress); // Init chip8 emulator
+    chip8.init();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    // Init chip8 emulator
-    // chip8.init();
-    // chip8.loadGame("game.c8");
+    const rom_data = try openROM("game.c8", allocator);
+    defer allocator.free(rom_data);
+
+    try chip8.loadROM(rom_data);
+    chip8.printMemory();
 
     // Wait for the user to close the window.
     while (!window.shouldClose()) {
