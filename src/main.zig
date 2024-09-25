@@ -57,11 +57,19 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const rom_data = try openROM("game.c8", allocator);
+    const rom_data = try openROM("ibm_logo.ch8", allocator);
     defer allocator.free(rom_data);
 
     try chip8.loadROM(rom_data);
-    chip8.printMemory();
+    // chip8.printMemory();
+
+    chip8.step();
+    chip8.printRegisters();
+
+    const lastTime = std.time.milliTimestamp();
+    const currentTime = std.time.milliTimestamp();
+
+    std.debug.print("{d}, {d}\n", .{lastTime, currentTime});
 
     // Wait for the user to close the window.
     while (!window.shouldClose()) {
@@ -78,6 +86,12 @@ pub fn main() !void {
 
         window.swapBuffers();
         glfw.pollEvents();
+
+        // if the difference between polled times is greater than the time it would take to achieve 60hz, then step and draw
+        // 1000 miliseconds divided by the hz we want our screen to refresh at
+        if(@as(f64, @floatFromInt(currentTime-lastTime))>(1000.0/60.0)) {
+            chip8.step();
+        }
     }
 }
 

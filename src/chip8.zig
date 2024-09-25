@@ -52,10 +52,73 @@ pub fn loadROM(ROMBytes: []u8) !void {
 }
 
 pub fn step() void {
-    opcode = memory[pc] << 8 | memory[pc+1];
-    // switch (opcode) {
-    //     0x
-    // }
+    opcode = (@as(u16, memory[pc]) << 8) | memory[pc + 1];
+
+    // Implement these first for IBM program
+    // 00E0 (clear screen)
+    // 1NNN (jump)
+    // 6XNN (set register VX)
+    // 7XNN (add value to register VX)
+    // ANNN (set index register I)
+    // DXYN (display/draw)
+
+    switch(opcode & 0xF000) {
+      0x0000 => {
+        switch(opcode) {
+          0x00E0 => {},
+          0x00EE => {},
+          else => {},
+        }
+      },
+      0x1000 => {},
+      0x2000 => {},
+      0x3000 => {},
+      0x4000 => {},
+      0x5000 => {},
+      0x6000 => {},
+      0x7000 => {},
+      0x8000 => {
+        switch(opcode & 0xF) {
+          0x0 => {},
+          0x1 => {},
+          0x2 => {},
+          0x3 => {},
+          0x4 => {},
+          0x5 => {},
+          0x6 => {},
+          0x7 => {},
+          0xE => {},
+          else => {},
+        }
+      },
+      0x9000 => {},
+      0xA000 => {},
+      0xB000 => {},
+      0xC000 => {},
+      0xD000 => {},
+      0xE000 => {
+        switch(opcode & 0xFF) {
+          0x9E => {},
+          0xA1 => {},
+          else => {},
+        }
+      },
+      0xF000 => {
+        switch(opcode & 0xFF) {
+          0x07 => {},
+          0x0A => {},
+          0x15 => {},
+          0x18 => {},
+          0x1E => {},
+          0x29 => {},
+          0x33 => {},
+          0x55 => {},
+          0x65 => {},
+          else => {},
+        }
+      },
+      else => {},
+    }
 }
 
 pub fn printMemory() void {
@@ -67,4 +130,21 @@ pub fn printMemory() void {
         std.debug.print("{X:0>2} ", .{byte});
     }
     std.debug.print("\n", .{});
+}
+
+pub fn printRegisters() void {
+    std.debug.print("Registers printout:\n", .{});
+
+    // Print V registers (V0 to VF)
+    for (V, 0..) |reg, idx| {
+        std.debug.print("V{d}: 0x{X:0>2}\n", .{idx, reg});
+    }
+
+    // Print I and pc registers
+    std.debug.print("I: 0x{X:0>3}\n", .{I});
+    std.debug.print("PC: 0x{X:0>3}\n", .{pc});
+
+    // Print delay_timer and sound_timer
+    std.debug.print("Delay Timer: 0x{X:0>2}\n", .{delay_timer});
+    std.debug.print("Sound Timer: 0x{X:0>2}\n", .{sound_timer});
 }
