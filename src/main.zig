@@ -63,13 +63,11 @@ pub fn main() !void {
     try chip8.loadROM(rom_data);
     // chip8.printMemory();
 
-    chip8.step();
-    chip8.printRegisters();
+    // chip8.singleStep();
 
-    const lastTime = std.time.milliTimestamp();
-    const currentTime = std.time.milliTimestamp();
+    var lastTime = std.time.milliTimestamp();
+    var currentTime = std.time.milliTimestamp();
 
-    std.debug.print("{d}, {d}\n", .{lastTime, currentTime});
 
     // Wait for the user to close the window.
     while (!window.shouldClose()) {
@@ -90,9 +88,13 @@ pub fn main() !void {
         // if the difference between polled times is greater than the time it would take to achieve 60hz, then step and draw
         // 1000 miliseconds divided by the hz we want our screen to refresh at
         if(@as(f64, @floatFromInt(currentTime-lastTime))>(1000.0/60.0)) {
-            chip8.step();
+            chip8.speedScaledStep();
+            lastTime = currentTime;
         }
+        currentTime = std.time.milliTimestamp();
     }
+    chip8.printScreen();
+    chip8.printRegisters();
 }
 
 fn processInput(window: glfw.Window) void {

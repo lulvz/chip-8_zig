@@ -4,6 +4,10 @@ const font = @import("font.zig").font;
 
 const chip8 = @This();
 
+// amount of instructions to run per scaledSpeedStep
+// so if we are rendering at 60hz, we would run 60*10 instructions every second 
+var speed: u32 = undefined;
+
 var opcode: u16 = undefined; // opcodes are 2 bytes long
 
 // Memory map
@@ -17,7 +21,7 @@ var I: u12 = undefined; // 12 bit index register
 var pc: u12 = undefined; // 12 bit program counter, 12 bits allow access to 4096 places in memory
 
 // The screen is 64 by 32 pixels, and they can either be on or off
-var screen: [64*32]u1 = undefined;
+var screen: [64 * 32]u1 = undefined;
 
 // These timers count down to 0 at 60hz when set any value over 0
 var delay_timer: u8 = undefined;
@@ -29,11 +33,12 @@ var call_stack = Chip8Stack.init();
 var keys: [16]u1 = undefined; // Pressed keys 0 to 9 and A to F
 
 pub fn init() void {
+    speed = 10;
     opcode = 0x0;
     // Set memory to all zeros
     @memset(&memory, 0x0);
     // Then we load the fontset into 0x50 onwards
-    @memcpy(memory[0x50..0x50+font.len], &font);
+    @memcpy(memory[0x50 .. 0x50 + font.len], &font);
 
     @memset(&V, 0x0);
     I = 0x0;
@@ -48,12 +53,17 @@ pub fn loadROM(ROMBytes: []u8) !void {
     if (0x200 + ROMBytes.len > memory.len) {
         return error.ROMTooLarge;
     }
-    @memcpy(memory[0x200..0x200+ROMBytes.len], ROMBytes);
+    @memcpy(memory[0x200 .. 0x200 + ROMBytes.len], ROMBytes);
 }
 
-pub fn step() void {
+pub fn setSpeed(s: u32) void {
+    speed = s;
+}
+
+pub fn singleStep() void {
     opcode = (@as(u16, memory[pc]) << 8) | memory[pc + 1];
 
+    pc += 2;
     // Implement these first for IBM program
     // 00E0 (clear screen)
     // 1NNN (jump)
@@ -62,62 +72,102 @@ pub fn step() void {
     // ANNN (set index register I)
     // DXYN (display/draw)
 
-    switch(opcode & 0xF000) {
-      0x0000 => {
-        switch(opcode) {
-          0x00E0 => {},
-          0x00EE => {},
-          else => {},
-        }
-      },
-      0x1000 => {},
-      0x2000 => {},
-      0x3000 => {},
-      0x4000 => {},
-      0x5000 => {},
-      0x6000 => {},
-      0x7000 => {},
-      0x8000 => {
-        switch(opcode & 0xF) {
-          0x0 => {},
-          0x1 => {},
-          0x2 => {},
-          0x3 => {},
-          0x4 => {},
-          0x5 => {},
-          0x6 => {},
-          0x7 => {},
-          0xE => {},
-          else => {},
-        }
-      },
-      0x9000 => {},
-      0xA000 => {},
-      0xB000 => {},
-      0xC000 => {},
-      0xD000 => {},
-      0xE000 => {
-        switch(opcode & 0xFF) {
-          0x9E => {},
-          0xA1 => {},
-          else => {},
-        }
-      },
-      0xF000 => {
-        switch(opcode & 0xFF) {
-          0x07 => {},
-          0x0A => {},
-          0x15 => {},
-          0x18 => {},
-          0x1E => {},
-          0x29 => {},
-          0x33 => {},
-          0x55 => {},
-          0x65 => {},
-          else => {},
-        }
-      },
-      else => {},
+    switch (opcode & 0xF000) {
+        0x0000 => {
+            switch (opcode) {
+                0x00E0 => {
+                    @memset(&screen, 0x0);
+                },
+                0x00EE => {},
+                else => {},
+            }
+        },
+        0x1000 => {
+            pc = @as(u12, @truncate(opcode & 0x0FFF));
+            // std.debug.print("{x}\n", .{pc});
+            // std.debug.print("{x}\n", .{(@as(u16, memory[pc]) << 8) | memory[pc + 1]});
+        },
+        0x2000 => {},
+        0x3000 => {},
+        0x4000 => {},
+        0x5000 => {},
+        0x6000 => {
+            V[@as(usize, (opcode&0x0F00) >> 8)] = @as(u8, @truncate(opcode & 0x00FF));
+        },
+        0x7000 => {
+            V[@as(usize, (opcode&0x0F00) >> 8)] +%= @as(u8, @truncate(opcode & 0xFF));
+        },
+        0x8000 => {
+            switch (opcode & 0xF) {
+                0x0 => {},
+                0x1 => {},
+                0x2 => {},
+                0x3 => {},
+                0x4 => {},
+                0x5 => {},
+                0x6 => {},
+                0x7 => {},
+                0xE => {},
+                else => {},
+            }
+        },
+        0x9000 => {},
+        0xA000 => {
+            I = @as(u12, @truncate(opcode & 0x0FFF));
+        },
+        0xB000 => {},
+        0xC000 => {},
+        // DXYN
+        // TODO: ADD WRAP AROUND AND COLLISION
+        0xD000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
+            const y: usize = @as(usize, (opcode&0x00F0) >> 4);
+            const n: usize = @as(usize, (opcode&0x000F)); // n is the amount of bytes to be read, which is also the height since every sprite is 8 in width
+
+            const px = V[x];
+            const py = V[y];
+
+            V[0xF] = 0; // set collision to 0
+
+            var spriteLine: u8 = undefined;
+            for(0..n) |i| {
+                spriteLine = memory[@as(usize, I) + i]; 
+                for(0..8) |j| {
+                    screen[(@as(usize, py)+i)*64 + @as(usize, px) + j] = @as(u1, @truncate((spriteLine >> @truncate(7-j)) & 1));
+                }
+            }
+
+        },
+        0xE000 => {
+            switch (opcode & 0xFF) {
+                0x9E => {},
+                0xA1 => {},
+                else => {},
+            }
+        },
+        0xF000 => {
+            switch (opcode & 0xFF) {
+                0x07 => {},
+                0x0A => {},
+                0x15 => {},
+                0x18 => {},
+                0x1E => {},
+                0x29 => {},
+                0x33 => {},
+                0x55 => {},
+                0x65 => {},
+                else => {},
+            }
+        },
+        else => {
+            std.debug.print("default\n", .{});
+        },
+    }
+}
+
+pub fn speedScaledStep() void {
+    for(0..speed) |_| {
+        singleStep();
     }
 }
 
@@ -137,7 +187,7 @@ pub fn printRegisters() void {
 
     // Print V registers (V0 to VF)
     for (V, 0..) |reg, idx| {
-        std.debug.print("V{d}: 0x{X:0>2}\n", .{idx, reg});
+        std.debug.print("V{d}: 0x{X:0>2}\n", .{ idx, reg });
     }
 
     // Print I and pc registers
@@ -147,4 +197,15 @@ pub fn printRegisters() void {
     // Print delay_timer and sound_timer
     std.debug.print("Delay Timer: 0x{X:0>2}\n", .{delay_timer});
     std.debug.print("Sound Timer: 0x{X:0>2}\n", .{sound_timer});
+}
+
+pub fn printScreen() void {
+    std.debug.print("Screen printout:\n", .{});
+    for (screen[0..], 0..) |byte, i| {
+        if (i % 64 == 0) {
+            std.debug.print("\n{d} ", .{i/64});
+        }
+        std.debug.print("{X}", .{byte});
+    }
+    std.debug.print("\n", .{}); 
 }
