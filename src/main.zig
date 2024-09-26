@@ -102,7 +102,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const rom_data = try openROM("ibm_logo.ch8", allocator);
+    const rom_data = try openROM("game.ch8", allocator);
     defer allocator.free(rom_data);
     try chip8.loadROM(rom_data);
 
@@ -164,7 +164,7 @@ pub fn main() !void {
         if (delta_time >= frame_time) {
             processInput(window);
 
-            chip8.speedScaledStep();
+            try chip8.speedScaledStep();
 
             // Update texture with Chip-8 screen data
             var textureData: [64 * 32]u8 = undefined;

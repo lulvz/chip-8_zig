@@ -22,19 +22,19 @@ pub fn Stack(comptime T: type, comptime stack_size: usize) type {
             self.current_location += 1;
         }
 
-        pub fn pop(self: *Self) ?T {
+        pub fn pop(self: *Self) !T {
             if (self.current_location == 0) {
                 std.debug.print("Stack Underflow!\n", .{});
-                return null;
+                return error.StackUnderflow;
             }
             self.current_location -= 1;
             return self.items[self.current_location];
         }
 
-        pub fn top(self: *const Self) ?T {
+        pub fn top(self: *const Self) !T {
             if (self.current_location == 0) {
                 std.debug.print("Stack is empty!\n", .{});
-                return null;
+                return error.StackEmpty;
             }
             return self.items[self.current_location - 1];
         }

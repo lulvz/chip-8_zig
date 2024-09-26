@@ -60,7 +60,7 @@ pub fn setSpeed(s: u32) void {
     speed = s;
 }
 
-pub fn singleStep() void {
+pub fn singleStep() !void {
     opcode = (@as(u16, memory[pc]) << 8) | memory[pc + 1];
 
     pc += 2;
@@ -78,7 +78,9 @@ pub fn singleStep() void {
                 0x00E0 => {
                     @memset(&screen, 0x0);
                 },
-                0x00EE => {},
+                0x00EE => {
+                    pc = try call_stack.pop();
+                },
                 else => {},
             }
         },
@@ -87,10 +89,34 @@ pub fn singleStep() void {
             // std.debug.print("{x}\n", .{pc});
             // std.debug.print("{x}\n", .{(@as(u16, memory[pc]) << 8) | memory[pc + 1]});
         },
-        0x2000 => {},
-        0x3000 => {},
-        0x4000 => {},
-        0x5000 => {},
+        0x2000 => {
+            call_stack.push(pc);
+            pc = @as(u12, @truncate(opcode & 0x0FFF));
+        },
+        // 3xkk
+        0x3000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
+            const n: usize = @as(u8, @truncate(opcode&0x00FF)); // n is the amount of bytes to be read, which is also the height since every sprite is 8 in width
+            if(n == V[x]) {
+                pc += 2;
+            }
+        },
+        // 4xkk
+        0x4000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
+            const n: usize = @as(u8, @truncate(opcode&0x00FF)); // n is the amount of bytes to be read, which is also the height since every sprite is 8 in width
+            if(n != V[x]) {
+                pc += 2;
+            }
+        },
+        // 5xy0
+        0x5000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
+            const y: usize = @as(usize, (opcode&0x00F0) >> 4);
+            if(V[x] == V[y]) {
+                pc += 2;
+            }
+        },
         0x6000 => {
             V[@as(usize, (opcode&0x0F00) >> 8)] = @as(u8, @truncate(opcode & 0x00FF));
         },
@@ -98,12 +124,26 @@ pub fn singleStep() void {
             V[@as(usize, (opcode&0x0F00) >> 8)] +%= @as(u8, @truncate(opcode & 0xFF));
         },
         0x8000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
+            const y: usize = @as(usize, (opcode&0x00F0) >> 4);
             switch (opcode & 0xF) {
-                0x0 => {},
-                0x1 => {},
-                0x2 => {},
-                0x3 => {},
-                0x4 => {},
+                0x0 => {
+                    V[x] = V[y];
+                },
+                0x1 => {
+                    V[x] |= V[y];
+                },
+                0x2 => {
+                    V[x] &= V[y];
+                },
+                0x3 => {
+                    V[x] ^= V[y];
+                },
+                0x4 => {
+                    const result_overflow_tuple = @addWithOverflow(V[x], V[y]);
+                    V[x] = result_overflow_tuple[0];
+                    V[0xF] = @as(u8, result_overflow_tuple[1]);
+                },
                 0x5 => {},
                 0x6 => {},
                 0x7 => {},
@@ -165,9 +205,9 @@ pub fn singleStep() void {
     }
 }
 
-pub fn speedScaledStep() void {
+pub fn speedScaledStep() !void {
     for(0..speed) |_| {
-        singleStep();
+        try singleStep();
     }
 }
 
