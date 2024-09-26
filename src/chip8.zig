@@ -21,7 +21,7 @@ var I: u12 = undefined; // 12 bit index register
 var pc: u12 = undefined; // 12 bit program counter, 12 bits allow access to 4096 places in memory
 
 // The screen is 64 by 32 pixels, and they can either be on or off
-var screen: [64 * 32]u1 = undefined;
+pub var screen: [64 * 32]u1 = undefined;
 
 // These timers count down to 0 at 60hz when set any value over 0
 var delay_timer: u8 = undefined;
