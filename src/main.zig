@@ -102,7 +102,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const rom_data = try openROM("3-corax+.ch8", allocator);
+    const rom_data = try openROM("5-quirks.ch8", allocator);
     defer allocator.free(rom_data);
     try chip8.loadROM(rom_data);
 
@@ -192,7 +192,39 @@ pub fn main() !void {
 }
 
 fn processInput(window: glfw.Window) void {
+    const key_map: [16]glfw.Key = .{
+        glfw.Key.x,    // 0
+        glfw.Key.one,    // 1
+        glfw.Key.two,    // 2
+        glfw.Key.three,    // 3
+        glfw.Key.q,    // 4
+        glfw.Key.w,    // 5
+        glfw.Key.e,    // 6
+        glfw.Key.a,    // 7
+        glfw.Key.s,    // 8
+        glfw.Key.d,    // 9
+        glfw.Key.z,    // A
+        glfw.Key.c,    // B
+        glfw.Key.four,    // C
+        glfw.Key.r,    // D
+        glfw.Key.f,    // E
+        glfw.Key.v,    // F
+    };
+
     if (window.getKey(glfw.Key.escape) == glfw.Action.press) {
         window.setShouldClose(true);
+    }
+
+        // Iterate over each key in the Chip-8 key mapping
+    for (key_map, 0..key_map.len) |key, index| {
+        const is_pressed = window.getKey(key) == glfw.Action.press;
+        const is_released = window.getKey(key) == glfw.Action.release;
+        
+        // Set the key state in the Chip-8 keys array
+        if (is_pressed) {
+            chip8.keys[index] = true;
+        } else if (is_released) {
+            chip8.keys[index] = false;
+        }
     }
 }

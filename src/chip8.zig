@@ -8,6 +8,8 @@ const chip8 = @This();
 // so if we are rendering at 60hz, we would run 60*10 instructions every second 
 var speed: u32 = undefined;
 
+const FONT_ADDRESS_START: u12 = 0x050;
+
 var opcode: u16 = undefined; // opcodes are 2 bytes long
 
 // Memory map
@@ -30,7 +32,7 @@ var sound_timer: u8 = undefined;
 const Chip8Stack = Stack(u12, 16); // Stack type with 16 slots of type u12 because it will be used to store addresses to memory
 var call_stack = Chip8Stack.init();
 
-var keys: [16]bool = undefined; // Pressed keys 0 to 9 and A to F
+pub var keys: [16]bool = undefined; // Pressed keys 0 to 9 and A to F
 
 var rand: std.Random = undefined;
 
@@ -40,7 +42,7 @@ pub fn init() !void {
     // Set memory to all zeros
     @memset(&memory, 0x0);
     // Then we load the fontset into 0x50 onwards
-    @memcpy(memory[0x50 .. 0x50 + font.len], &font);
+    @memcpy(memory[FONT_ADDRESS_START..(FONT_ADDRESS_START + font.len)], &font);
 
     @memset(&V, 0x0);
     I = 0x0;
@@ -73,13 +75,6 @@ pub fn singleStep() !void {
     opcode = (@as(u16, memory[pc]) << 8) | memory[pc + 1];
 
     pc += 2;
-    // Implement these first for IBM program
-    // 00E0 (clear screen)
-    // 1NNN (jump)
-    // 6XNN (set register VX)
-    // 7XNN (add value to register VX)
-    // ANNN (set index register I)
-    // DXYN (display/draw)
 
     switch (opcode & 0xF000) {
         0x0000 => {
@@ -95,8 +90,6 @@ pub fn singleStep() !void {
         },
         0x1000 => {
             pc = @as(u12, @truncate(opcode & 0x0FFF));
-            // std.debug.print("{x}\n", .{pc});
-            // std.debug.print("{x}\n", .{(@as(u16, memory[pc]) << 8) | memory[pc + 1]});
         },
         0x2000 => {
             call_stack.push(pc);
@@ -141,12 +134,15 @@ pub fn singleStep() !void {
                 },
                 0x1 => {
                     V[x] |= V[y];
+                    V[0xF] = 0x0;
                 },
                 0x2 => {
                     V[x] &= V[y];
+                    V[0xF] = 0x0;
                 },
                 0x3 => {
                     V[x] ^= V[y];
+                    V[0xF] = 0x0;
                 },
                 0x4 => {
                     const result_overflow_tuple = @addWithOverflow(V[x], V[y]);
@@ -156,21 +152,25 @@ pub fn singleStep() !void {
                 0x5 => {
                     const result_overflow_tuple = @subWithOverflow(V[x], V[y]);
                     V[x] = result_overflow_tuple[0];
-                    V[0xF] = @as(u8, result_overflow_tuple[1]);
+                     V[0xF] = @as(u8, ~result_overflow_tuple[1]);
                 },
                 0x6 => {
-                    V[0xF] = V[x]&0x1;
-                    V[x] = V[x] >> 1;
+                    V[x] = V[y];
+                    const lsb: u8 = V[x]&0x1;
+                    V[x] >>= 1;
+                    V[0xF] = lsb; 
                     // add quirks
                 },
                 0x7 => {
                     const result_overflow_tuple = @subWithOverflow(V[y], V[x]);
                     V[x] = result_overflow_tuple[0];
-                    V[0xF] = @as(u8, result_overflow_tuple[1]);
+                    V[0xF] = @as(u8, ~result_overflow_tuple[1]);
                 },
                 0xE => {
-                    V[0xF] = V[x]&(0x1<<7);
-                    V[x] = V[x] << 1;
+                    V[x] = V[y];
+                    const msb: u8 = (V[x] & (0x1<<7))>>7;
+                    V[x] <<= 1;
+                    V[0xF] = msb;
                 },
                 else => {},
             }
@@ -189,28 +189,40 @@ pub fn singleStep() !void {
         0xB000 => {
             pc = @as(u12, @truncate(opcode & 0x0FFF)) + @as(u12, V[0]);
         },
-        0xC000 => {},
-        // DXYN
-        // TODO: ADD WRAP AROUND AND COLLISION
+        0xC000 => {
+            const x: usize = @as(usize, (opcode & 0x0F00) >> 8);
+            const n: u8 = @as(u8, @truncate(opcode & 0x00FF));
+            const randVal = rand.int(u8);
+            V[x] = n & randVal;
+        },
         0xD000 => {
-            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
-            const y: usize = @as(usize, (opcode&0x00F0) >> 4);
-            const n: usize = @as(usize, (opcode&0x000F)); // n is the amount of bytes to be read, which is also the height since every sprite is 8 in width
+            const x: usize = @as(usize, (opcode & 0x0F00) >> 8);
+            const y: usize = @as(usize, (opcode & 0x00F0) >> 4);
+            const n: usize = @as(usize, opcode & 0x000F);
 
-            const px = V[x];
-            const py = V[y];
+            const px = @as(usize, V[x]) % 64;
+            const py = @as(usize, V[y]) % 32;
 
-            V[0xF] = 0; // set collision to 0
+            V[0xF] = 0; // Reset collision flag
 
-            var spriteLine: u8 = undefined;
-            for(0..n) |i| {
-                spriteLine = memory[@as(usize, I) + i]; 
-                for(0..8) |j| {
-                    screen[(@as(usize, py)+i)*64 + @as(usize, px) + j] = @as(u1, @truncate((spriteLine >> @truncate(7-j)) & 1));
+            for (0..n) |row| {
+                if (py + row >= 32) break; // Stop if we're past the bottom of the screen
+                const sprite_row = memory[@as(usize, I) + row];
+                for (0..8) |col| {
+                    if (px + col >= 64) break; // Stop if we're past the right edge of the screen
+                    const sprite_pixel = (sprite_row >> @as(u3, @truncate(7 - col))) & 1;
+                    const screen_index = (py + row) * 64 + px + col;
+                    const screen_pixel = screen[screen_index];
+
+                    if (sprite_pixel == 1) {
+                        if (screen_pixel == 1) {
+                            V[0xF] = 1; // Set collision flag
+                        }
+                        screen[screen_index] ^= 1; // XOR the pixel
+                    }
                 }
             }
-
-        },
+        },        
         0xE000 => {
             const x: usize = @as(usize, (opcode&0x0F00) >> 8);
             switch (opcode & 0xFF) {
@@ -234,7 +246,13 @@ pub fn singleStep() !void {
                     V[x] = delay_timer;
                 },
                 0x0A => {
-
+                    for(keys, 0..keys.len) |key, i| {
+                        if(key) {
+                            V[x] = @as(u8, @truncate(i));
+                            return;
+                        }
+                    }
+                    pc -= 2;
                 },
                 0x15 => {
                     delay_timer = V[x];
@@ -246,7 +264,8 @@ pub fn singleStep() !void {
                     I = @addWithOverflow(I, V[x])[0];
                 },
                 0x29 => {
-
+                    const digit = V[x] & 0x0F;
+                    I = FONT_ADDRESS_START + @as(u12, digit * 5);
                 },
                 0x33 => {
                     var value = V[x];
@@ -260,11 +279,13 @@ pub fn singleStep() !void {
                     for(0..x+1) |i| {
                         memory[@as(usize, I)+i] = V[i];
                     }
+                    I += @as(u12, @truncate(x+1));
                 },
                 0x65 => {
                     for(0..x+1) |i| {
                         V[i] = memory[@as(usize, I)+i];
                     }
+                    I += @as(u12, @truncate(x+1));
                 },
                 else => {},
             }
@@ -279,6 +300,9 @@ pub fn speedScaledStep() !void {
     for(0..speed) |_| {
         try singleStep();
     }
+    //decrement timers
+    if(delay_timer>0) delay_timer-=1;
+    if(sound_timer>0) sound_timer-=1;
 }
 
 pub fn printMemory() void {
