@@ -6,7 +6,7 @@ This project is a CHIP-8 emulator written in Zig. The emulator simulates the fun
 
 Pong gameplay
 
-![Pong Video](img/pong.mp4)
+![Pong Video](img/pong.gif)
 
 # Screenshot
 
