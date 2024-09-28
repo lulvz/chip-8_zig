@@ -8,8 +8,6 @@ Pong gameplay
 
 ![Pong Video](img/pong.gif)
 
-# Screenshot
-
 Corax+ test
 
 ![Emulator Screenshot](img/3-corax+_sc.png)
