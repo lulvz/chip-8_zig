@@ -102,7 +102,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const rom_data = try openROM("roms/5-quirks.ch8", allocator);
+    const rom_data = try openROM("roms/Pong (1 player).ch8", allocator);
     defer allocator.free(rom_data);
     try chip8.loadROM(rom_data);
 
