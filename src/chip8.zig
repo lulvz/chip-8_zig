@@ -30,9 +30,11 @@ var sound_timer: u8 = undefined;
 const Chip8Stack = Stack(u12, 16); // Stack type with 16 slots of type u12 because it will be used to store addresses to memory
 var call_stack = Chip8Stack.init();
 
-var keys: [16]u1 = undefined; // Pressed keys 0 to 9 and A to F
+var keys: [16]bool = undefined; // Pressed keys 0 to 9 and A to F
 
-pub fn init() void {
+var rand: std.Random = undefined;
+
+pub fn init() !void {
     speed = 10;
     opcode = 0x0;
     // Set memory to all zeros
@@ -46,7 +48,14 @@ pub fn init() void {
     @memset(&screen, 0x0);
     delay_timer = 0x0;
     sound_timer = 0x0;
-    @memset(&keys, 0x0);
+    @memset(&keys, false);
+
+    var prng = std.rand.DefaultPrng.init(blk: {
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        break :blk seed;
+    });
+    rand = prng.random();
 }
 
 pub fn loadROM(ROMBytes: []u8) !void {
@@ -144,18 +153,42 @@ pub fn singleStep() !void {
                     V[x] = result_overflow_tuple[0];
                     V[0xF] = @as(u8, result_overflow_tuple[1]);
                 },
-                0x5 => {},
-                0x6 => {},
-                0x7 => {},
-                0xE => {},
+                0x5 => {
+                    const result_overflow_tuple = @subWithOverflow(V[x], V[y]);
+                    V[x] = result_overflow_tuple[0];
+                    V[0xF] = @as(u8, result_overflow_tuple[1]);
+                },
+                0x6 => {
+                    V[0xF] = V[x]&0x1;
+                    V[x] = V[x] >> 1;
+                    // add quirks
+                },
+                0x7 => {
+                    const result_overflow_tuple = @subWithOverflow(V[y], V[x]);
+                    V[x] = result_overflow_tuple[0];
+                    V[0xF] = @as(u8, result_overflow_tuple[1]);
+                },
+                0xE => {
+                    V[0xF] = V[x]&(0x1<<7);
+                    V[x] = V[x] << 1;
+                },
                 else => {},
             }
         },
-        0x9000 => {},
+        0x9000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
+            const y: usize = @as(usize, (opcode&0x00F0) >> 4);
+
+            if(V[x] != V[y]) {
+                pc += 2;
+            }
+        },
         0xA000 => {
             I = @as(u12, @truncate(opcode & 0x0FFF));
         },
-        0xB000 => {},
+        0xB000 => {
+            pc = @as(u12, @truncate(opcode & 0x0FFF)) + @as(u12, V[0]);
+        },
         0xC000 => {},
         // DXYN
         // TODO: ADD WRAP AROUND AND COLLISION
@@ -179,23 +212,60 @@ pub fn singleStep() !void {
 
         },
         0xE000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
             switch (opcode & 0xFF) {
-                0x9E => {},
-                0xA1 => {},
+                0x9E => {
+                    if(keys[V[x]]) {
+                        pc += 2;
+                    } 
+                },
+                0xA1 => {
+                    if(!keys[V[x]]) {
+                        pc += 2;
+                    }
+                },
                 else => {},
             }
         },
         0xF000 => {
+            const x: usize = @as(usize, (opcode&0x0F00) >> 8);
             switch (opcode & 0xFF) {
-                0x07 => {},
-                0x0A => {},
-                0x15 => {},
-                0x18 => {},
-                0x1E => {},
-                0x29 => {},
-                0x33 => {},
-                0x55 => {},
-                0x65 => {},
+                0x07 => {
+                    V[x] = delay_timer;
+                },
+                0x0A => {
+
+                },
+                0x15 => {
+                    delay_timer = V[x];
+                },
+                0x18 => {
+                    sound_timer = V[x];
+                },
+                0x1E => {
+                    I = @addWithOverflow(I, V[x])[0];
+                },
+                0x29 => {
+
+                },
+                0x33 => {
+                    var value = V[x];
+                    memory[I+2] = value % 10; // ones
+                    value = value / 10;
+                    memory[I+1] = value % 10;// tens 
+                    value = value / 10;
+                    memory[I] = value % 10;// hundreds 
+                },
+                0x55 => {
+                    for(0..x+1) |i| {
+                        memory[@as(usize, I)+i] = V[i];
+                    }
+                },
+                0x65 => {
+                    for(0..x+1) |i| {
+                        V[i] = memory[@as(usize, I)+i];
+                    }
+                },
                 else => {},
             }
         },

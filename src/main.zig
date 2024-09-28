@@ -96,13 +96,13 @@ pub fn main() !void {
     try gl.load(proc, glGetProcAddress);
 
     // Init chip8 emulator
-    chip8.init();
+    try chip8.init();
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const rom_data = try openROM("game.ch8", allocator);
+    const rom_data = try openROM("3-corax+.ch8", allocator);
     defer allocator.free(rom_data);
     try chip8.loadROM(rom_data);
 
