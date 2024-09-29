@@ -13,22 +13,6 @@ fn glGetProcAddress(p: glfw.GLProc, proc: [:0]const u8) ?gl.FunctionPointer {
     return glfw.getProcAddress(proc);
 }
 
-pub fn openROM(rom_path: []const u8, allocator: std.mem.Allocator) ![]u8 {
-    const file = try std.fs.cwd().openFile(rom_path, .{});
-    defer file.close();
-    
-    const file_size = try file.getEndPos();
-    const buffer = try allocator.alloc(u8, file_size);
-    errdefer allocator.free(buffer);
-    
-    const bytes_read = try file.readAll(buffer);
-    if (bytes_read != file_size) {
-        return error.IncompleteRead;
-    }
-    
-    return buffer;
-}
-
 const vertex_shader_source: [:0]const u8 =
     \\#version 330 core
     \\layout (location = 0) in vec2 aPos;
@@ -71,6 +55,22 @@ fn createShaderProgram() !gl.GLuint {
     return shader_program;
 }
 
+pub fn openROM(rom_path: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    const file = try std.fs.cwd().openFile(rom_path, .{});
+    defer file.close();
+    
+    const file_size = try file.getEndPos();
+    const buffer = try allocator.alloc(u8, file_size);
+    errdefer allocator.free(buffer); // buffer is freed on error
+    
+    const bytes_read = try file.readAll(buffer);
+    if (bytes_read != file_size) {
+        return error.IncompleteRead;
+    }
+    
+    return buffer;
+}
+
 pub fn main() !void {
     glfw.setErrorCallback(errorCallback);
     if (!glfw.init(.{})) {
@@ -92,6 +92,7 @@ pub fn main() !void {
     defer window.destroy();
 
     glfw.makeContextCurrent(window);
+
     const proc: glfw.GLProc = undefined;
     try gl.load(proc, glGetProcAddress);
 
@@ -102,7 +103,16 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const rom_data = try openROM("roms/Pong (1 player).ch8", allocator);
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    if(args.len != 2) {
+        std.log.err("Wong number of arguments: {d}", .{args.len});
+        try std.io.getStdOut().writer().print("Program usage: {s}, <PATH_TO_ROM>\n", .{args[0]});
+        return;
+    }
+
+    const rom_data = try openROM(args[1], allocator);
     defer allocator.free(rom_data);
     try chip8.loadROM(rom_data);
 
@@ -162,6 +172,7 @@ pub fn main() !void {
         const delta_time = current_time - last_time;
 
         if (delta_time >= frame_time) {
+            // gl.clear(gl.COLOR_BUFFER_BIT);
             processInput(window);
 
             try chip8.speedScaledStep();
@@ -172,9 +183,6 @@ pub fn main() !void {
                 textureData[i] = if (chip8.screen[i] == 1) 255 else 0;
             }
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RED, 64, 32, 0, gl.RED, gl.UNSIGNED_BYTE, &textureData);
-
-            gl.clearColor(0.2, 0.3, 0.3, 1.0);
-            gl.clear(gl.COLOR_BUFFER_BIT);
 
             gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, null);
 
