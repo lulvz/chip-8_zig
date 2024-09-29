@@ -80,7 +80,7 @@ pub fn main() !void {
     defer glfw.terminate();
 
     // Create our window
-    const window = glfw.Window.create(640, 320, "Chip-8 Emulator", null, null, .{
+    const window = glfw.Window.create(64*20, 32*20, "Chip-8 Emulator", null, null, .{
         .context_version_major = 3,
         .context_version_minor = 3,
         .opengl_profile = .opengl_core_profile,
