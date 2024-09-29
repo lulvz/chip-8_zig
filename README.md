@@ -86,7 +86,7 @@ The project is highly modular:
 2. Install Zig 0.13.0
 3. Compile and run the emulator:
     ```bash
-    zig build run
+    zig build run -- PATH_TO_ROM
     ```
 
 OpenGL version 4.5 (used https://github.com/ikskuh/zig-opengl), very likely could have used an older version for higher compatibility with older devices.
