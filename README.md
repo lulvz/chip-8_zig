@@ -54,29 +54,18 @@ Corax+ test
 3. **Graphics Rendering**: 
    - The emulator uses OpenGL shaders to render the 64x32 monochrome display, scaling it up to fit the window size.
 
-4. **Timers**: 
+4. **Timers**:
    - Timers are decremented in sync with the main execution loop at 60hz;
-
-## Modularity
-
-The project is highly modular:
-- **Stack**: Implemented as a standalone module, making it reusable in other projects.
-- **Graphics**: The OpenGL-based rendering system can be easily replaced or extended.
-- **Emulation**: The core CPU logic is separated from the input/output system, allowing for potential future expansion to other emulated systems.
 
 ## Future Improvements
 
-- **Sound Implementation**: 
-  - The CHIP-8 sound functionality is not yet implemented. Adding a simple tone generator for the sound timer would complete the emulation.
+- **Sound Implementation**
   
-- **Configurable Keybindings**: 
-  - Currently, the emulator uses default key mappings. Implementing configurable keybindings would enhance usability.
+- **Configurable Keybindings**
   
-- **Save States**: 
-  - Implementing the ability to save and load emulator..
+- **Save States**
 
-- **Support for Super CHIP-8**: 
-  - Extending the emulator to support Super CHIP-8 (an enhanced version of CHIP-8) could add support for more advanced features and games.
+- **Support for Super CHIP-8**
 
 ---
 
